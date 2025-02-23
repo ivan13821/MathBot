@@ -9,7 +9,7 @@ class Examples:
     @staticmethod
     def plus(level: int):
 
-        num1, num2 = choice(list(range(round((level+1)**1.5)))), choice(list(range(round((level+1)**1.5))))
+        num1, num2 = choice(list(range(round(level ** 1.05), round((level + 1) ** 1.37)))), choice(list(range(round(level ** 1.05), round((level + 1) ** 1.37))))
 
         example = f'{num1} + {num2} = ?'
 
@@ -22,7 +22,7 @@ class Examples:
     def minus(level: int):
 
 
-        num1, num2 = choice(list(range(round((level + 1) ** 1.5)))), choice(list(range(round((level + 1) ** 1.5))))
+        num1, num2 = choice(list(range(round(level ** 1.05), round((level + 1) ** 1.37)))), choice(list(range(round(level ** 1.05), round((level + 1) ** 1.37))))
 
         if num1 < num2:
             num1, num2 = num2, num1

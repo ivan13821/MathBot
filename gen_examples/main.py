@@ -5,6 +5,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove
+from aiogram.enums.parse_mode import ParseMode
+
 
 from config import get_tg_api_token
 
@@ -59,6 +61,7 @@ async def start(message: types.Message, state:FSMContext):
 
     """первое знакомство с пользователем"""
 
+    training_db[message.chat.id] = {'level': 1, 'answer': '', 'missing': 0}
     db.insert_user(message.chat.id)
 
     await message.answer('Здравствуй дорогой друг, этот бот создан чтобы помочь тебе отточить твои навыки в математике.', reply_markup=ExampleKeyboard.start_keyboard())
@@ -74,6 +77,7 @@ async def start(message: types.Message, state:FSMContext):
 async def training(message: types.Message, state:FSMContext):
 
     """Включает режим тренировка"""
+    training_db[message.chat.id] = {'level': 1, 'answer': '', 'missing': 0}
     await message.answer("Тренировка", reply_markup=ReplyKeyboardRemove())
     await message.answer("Выберите что вы хотели бы потренировать", reply_markup=ExampleKeyboard.training())
 
@@ -87,7 +91,6 @@ async def plus(call: types.CallbackQuery, state:FSMContext):
 
     if not call.message.chat.id in training_db.keys():
         await bot.send_message(call.message.chat.id, "Вы в тренировке сложения")
-        training_db[call.message.chat.id] = {'level':1, 'answer':''}
 
     example, answer = Examples.plus(training_db[call.message.chat.id]['level'])
 
@@ -109,15 +112,28 @@ async def plus_answer(message: types.Message, state:FSMContext):
         result = training_db[message.chat.id]['level']
         if int(db.select_levels(message.chat.id)[0]) < int(result): db.update_user(message.chat.id, level_plus=int(result))
         await state.clear()
-        training_db[message.chat.id] = {'level':1, 'answer':''}
         return message.answer("Вы вышли в основное меню", reply_markup=ExampleKeyboard.start_keyboard())
 
     if message.text == training_db[message.chat.id]['answer']:
-        await message.answer("Правильно!!!")
+        await message.answer("Правильно!!! &#128526;", parse_mode=ParseMode.HTML)
         training_db[message.chat.id]['level'] += 1
 
     else:
-        await message.answer("Неправильно(((")
+        training_db[message.chat.id]['missing'] += 1
+        if training_db[message.chat.id]['missing'] == 3:
+            result = training_db[message.chat.id]['level']
+            if int(db.select_levels(message.chat.id)[0]) < int(result): db.update_user(message.chat.id, level_plus=int(result))
+            await message.answer("К сожалению все ваши жизни потрачены &#128148;", parse_mode=ParseMode.HTML)
+            training_db[message.chat.id] = {'level': 1, 'answer': '', 'missing': 0}
+
+            example, answer = Examples.plus(training_db[message.chat.id]['level'])
+            example = f"Уровень {training_db[message.chat.id]['level']}\n" + example
+            training_db[message.chat.id]['answer'] = answer
+
+            await message.answer("Вы начали сначала")
+            return await message.answer(example)
+        else:
+            await message.answer(f"Неправильно &#128554;\nОсталось {(3-training_db[message.chat.id]['missing'])*'&#128150;'}", parse_mode=ParseMode.HTML)
 
     example, answer = Examples.plus(training_db[message.chat.id]['level'])
     example = f"Уровень {training_db[message.chat.id]['level']}\n"+example
@@ -138,7 +154,6 @@ async def minus(call: types.CallbackQuery, state:FSMContext):
 
     if not call.message.chat.id in training_db.keys():
         await bot.send_message(call.message.chat.id, "Вы в тренировке вычитания")
-        training_db[call.message.chat.id] = {'level':1, 'answer':''}
 
     example, answer = Examples.minus(training_db[call.message.chat.id]['level'])
 
@@ -160,15 +175,30 @@ async def plus_answer(message: types.Message, state:FSMContext):
         result = training_db[message.chat.id]['level']
         if int(db.select_levels(message.chat.id)[1]) < int(result): db.update_user(message.chat.id, level_minus=int(result))
         await state.clear()
-        training_db[message.chat.id] = {'level':1, 'answer':''}
         return message.answer("Вы вышли в основное меню", reply_markup=ExampleKeyboard.start_keyboard())
 
     if message.text == training_db[message.chat.id]['answer']:
-        await message.answer("Правильно!!!")
+        await message.answer("Правильно!!! &#128526;", parse_mode=ParseMode.HTML)
         training_db[message.chat.id]['level'] += 1
 
     else:
-        await message.answer("Неправильно(((")
+        training_db[message.chat.id]['missing'] += 1
+        if training_db[message.chat.id]['missing'] == 3:
+            result = training_db[message.chat.id]['level']
+            if int(db.select_levels(message.chat.id)[1]) < int(result): db.update_user(message.chat.id,
+                                                                                       level_minus=int(result))
+            training_db[message.chat.id] = {'level': 1, 'answer': '', 'missing': 0}
+            await message.answer("К сожалению все ваши жизни потрачены &#128148;", parse_mode=ParseMode.HTML)
+            example, answer = Examples.plus(training_db[message.chat.id]['level'])
+            example = f"Уровень {training_db[message.chat.id]['level']}\n" + example
+            training_db[message.chat.id]['answer'] = answer
+
+            await message.answer("Вы начали сначала")
+            return await message.answer(example)
+        else:
+            await message.answer(
+                f"Неправильно &#128554;\nОсталось {(3 - training_db[message.chat.id]['missing']) * '&#128150;'}",
+                parse_mode=ParseMode.HTML)
 
     example, answer = Examples.minus(training_db[message.chat.id]['level'])
     example = f"Уровень {training_db[message.chat.id]['level']}\n"+example
@@ -190,7 +220,6 @@ async def minus(call: types.CallbackQuery, state:FSMContext):
 
     if not call.message.chat.id in training_db.keys():
         await bot.send_message(call.message.chat.id, "Вы в тренировке умножения")
-        training_db[call.message.chat.id] = {'level':1, 'answer':''}
 
     example, answer = Examples.multi(training_db[call.message.chat.id]['level'])
 
@@ -212,16 +241,31 @@ async def plus_answer(message: types.Message, state:FSMContext):
         result = training_db[message.chat.id]['level']
         if int(db.select_levels(message.chat.id)[2]) < int(result): db.update_user(message.chat.id, level_mult=int(result))
         await state.clear()
-        training_db[message.chat.id] = {'level':1, 'answer':''}
         return message.answer("Вы вышли в основное меню", reply_markup=ExampleKeyboard.start_keyboard())
 
 
     if message.text == training_db[message.chat.id]['answer']:
-        await message.answer("Правильно!!!")
+        await message.answer("Правильно!!!	&#128526;", parse_mode=ParseMode.HTML)
         training_db[message.chat.id]['level'] += 1
 
     else:
-        await message.answer("Неправильно(((")
+        training_db[message.chat.id]['missing'] += 1
+        if training_db[message.chat.id]['missing'] == 3:
+            result = training_db[message.chat.id]['level']
+            if int(db.select_levels(message.chat.id)[2]) < int(result): db.update_user(message.chat.id,
+                                                                                       level_mult=int(result))
+            training_db[message.chat.id] = {'level': 1, 'answer': '', 'missing': 0}
+            await message.answer("К сожалению все ваши жизни потрачены &#128148;", parse_mode=ParseMode.HTML)
+            example, answer = Examples.plus(training_db[message.chat.id]['level'])
+            example = f"Уровень {training_db[message.chat.id]['level']}\n" + example
+            training_db[message.chat.id]['answer'] = answer
+
+            await message.answer("Вы начали сначала")
+            return await message.answer(example)
+        else:
+            await message.answer(
+                f"Неправильно &#128554;\nОсталось {(3 - training_db[message.chat.id]['missing']) * '&#128150;'}",
+                parse_mode=ParseMode.HTML)
 
     example, answer = Examples.multi(training_db[message.chat.id]['level'])
     example = f"Уровень {training_db[message.chat.id]['level']}\n"+example
@@ -242,7 +286,6 @@ async def minus(call: types.CallbackQuery, state:FSMContext):
 
     if not call.message.chat.id in training_db.keys():
         await bot.send_message(call.message.chat.id, "Вы в тренировке деления")
-        training_db[call.message.chat.id] = {'level':1, 'answer':''}
 
     example, answer = Examples.division(training_db[call.message.chat.id]['level'])
 
@@ -264,16 +307,32 @@ async def plus_answer(message: types.Message, state:FSMContext):
         result = training_db[message.chat.id]['level']
         if int(db.select_levels(message.chat.id)[3]) < int(result): db.update_user(message.chat.id, level_division=int(result))
         await state.clear()
-        training_db[message.chat.id] = {'level':1, 'answer':''}
+        training_db[message.chat.id] = {'level':1, 'answer':'', 'missing':0}
         return message.answer("Вы вышли в основное меню", reply_markup=ExampleKeyboard.start_keyboard())
 
 
     if message.text == training_db[message.chat.id]['answer']:
-        await message.answer("Правильно!!!")
+        await message.answer("Правильно!!! &#128526;", parse_mode=ParseMode.HTML)
         training_db[message.chat.id]['level'] += 1
 
     else:
-        await message.answer("Неправильно(((")
+        training_db[message.chat.id]['missing'] += 1
+        if training_db[message.chat.id]['missing'] == 3:
+            result = training_db[message.chat.id]['level']
+            if int(db.select_levels(message.chat.id)[3]) < int(result): db.update_user(message.chat.id,
+                                                                                       level_division=int(result))
+            training_db[message.chat.id] = {'level': 1, 'answer': '', 'missing': 0}
+            await message.answer("К сожалению все ваши жизни потрачены &#128148;", parse_mode=ParseMode.HTML)
+            example, answer = Examples.plus(training_db[message.chat.id]['level'])
+            example = f"Уровень {training_db[message.chat.id]['level']}\n" + example
+            training_db[message.chat.id]['answer'] = answer
+
+            await message.answer("Вы начали сначала")
+            return await message.answer(example)
+        else:
+            await message.answer(
+                f"Неправильно &#128554;\nОсталось {(3 - training_db[message.chat.id]['missing']) * '&#128150;'}",
+                parse_mode=ParseMode.HTML)
 
     example, answer = Examples.division(training_db[message.chat.id]['level'])
     example = f"Уровень {training_db[message.chat.id]['level']}\n"+example

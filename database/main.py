@@ -57,6 +57,10 @@ class Database:
 
         """Добавление нового пользователя """
 
+        self.execute_query(f"SELECT * FROM users WHERE chat_id={chat_id}")
+        if self.cur.fetchone():
+            return None
+
         self.execute_query(f"""INSERT INTO users (chat_id, level_plus, level_minus, level_mult, level_division)
                                     values
                                     ({chat_id}, {level_plus}, {level_minus}, {level_mult}, {level_division})""")
